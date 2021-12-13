@@ -19,7 +19,7 @@ function idk(n) {
 <Header/>
 
 <div class="generator">
-    <div><Controls on:found={idk}/></div>
+    <div><Controls on:found={idk} on:reset={() => {matches = []}}/></div>
     <div></div>
     {#each matches as address, i}
         <Address address={address[0]} k={address[1]}/>

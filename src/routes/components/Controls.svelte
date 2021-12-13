@@ -1,7 +1,6 @@
 
 <script lang="ts">
     import { createEventDispatcher } from "svelte";
-    import { ethers } from "ethers";
 
     const fixRegex = new RegExp('^([0-9a-fA-F])+$');
 
@@ -13,16 +12,6 @@
     var caseSense = true;
     var started = false;
     $: iffix = ((fixRegex.test(fix) || fix === '') ? false : true);
-    var found = [];
-
-    var startedCount = 0;
-    var finishedCount = 0;
-
-    var stats = {
-        'perSecond': 0,
-        'generated': 0,
-        'matches': 0
-    };
 
     function exampleCreation() {
         if (prefix) {
@@ -45,22 +34,26 @@
     var gps = [0];
     var gpsCount = 0;
     var matches = 0;
+    var workerCount = 1;
+    var totalCreated = [];
+    var created = 0;
 
-    async function calcGps() {
+    async function calcGpsAndCreated() {
         while (started) {
             var c = 0;
+            var cc = 0;
             for (var i = 0; i < gps.length; i++) {
                 c += gps[i];
+                cc += totalCreated[i];
             }
             gpsCount = c;
+            created = cc;
             await new Promise(resolve => setTimeout(resolve, 1000));
         }
     }
 
     function startstop() {
         started = !started;
-        found = [];
-        startedCount = 0;
         for (var i = 0; i < workers.length; i++) {
             workers[i].postMessage(["stop"]);
             gpsCount = 0;
@@ -68,10 +61,10 @@
         workers = [];
         gps = [];
         if (started) {
-            stats['matches'] = 0;
-            for (var i = 0; i < 10; i++) {
+            for (var i = 0; i < workerCount; i++) {
                 const worker = new Worker("/worker.js");
                 gps.push(0);
+                totalCreated.push(0);
                 worker.postMessage(["start", [fix, caseSense, prefix]]);
                 worker.onmessage = function(e) {
                     if (e.data[0] == "match") {
@@ -80,12 +73,21 @@
                     } else if (e.data[0] == "gps") {
                         gps.shift();
                         gps.push(e.data[1]);
+                    } else if (e.data[0] == "count") {
+                        totalCreated.shift();
+                        totalCreated.push(e.data[1]);
                     }
                 }
                 workers.push(worker);
             }
-            calcGps();
+            calcGpsAndCreated();
         }
+    }
+
+    function reset() {
+        dispath('reset');
+        matches = 0;
+        created = 0;
     }
 
     exampleCreation();
@@ -108,14 +110,20 @@
         <input type=checkbox bind:checked={caseSense}>
         <span style="margin-left: .1rem;">Case-sensitive</span>
     </div>
+    <div class="threads">
+        <input type="number" min="1" step="1" bind:value={workerCount}>
+        <span>Threads</span>
+    </div>
     <div class="submit">
         <button on:click={startstop} class:active={started}>{started ? 'Stop' : 'Start'}</button>
+        <button style="margin-right: 1rem;" on:click={reset}>Reset</button>
     </div>
 </div>
 
 <div class="stats">
     <p>Addresses generated per second: {gpsCount}</p>
     <p>Addresses matched: {matches}</p>
+    <p>Addresses created: {created.toLocaleString(undefined)}</p>
 </div>
 
 <style>
@@ -187,6 +195,12 @@
     .controls input[type=checkbox] {
         margin: 0;
         margin-top: .5rem;
+    }
+
+    .controls input[type=number] {
+        margin-top: .5rem;
+        width: 3rem;
+        display: inline-block;
     }
 
     .error {

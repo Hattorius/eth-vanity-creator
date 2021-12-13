@@ -21,6 +21,7 @@ var startedCount = 0;
 
 onmessage = function(e) {
     if (e.data[0] == "start") {
+        console.log("start");
         started = true;
         if (started) {
             fix = e.data[1][0];
@@ -30,7 +31,7 @@ onmessage = function(e) {
             genPerSecond();
         }
     } else if (e.data[0] == "stop") {
-        console.log("Got stop signal");
+        console.log("stop");
         started = false;
     }
 }
@@ -43,7 +44,7 @@ async function run() {
                 yes = true;
             } else if (caseSense && prefix && addresses[0].substring(2, fix.length + 2) == fix) {
                 yes = true;
-            } else if (!caseSense && !prefix && addresses[0].toLowerCase().endsWith(fix.toLowerCase())) {
+            } else if (caseSense && !prefix && addresses[0].toLowerCase().endsWith(fix.toLowerCase())) {
                 yes = true;
             } else if (!caseSense && !prefix && addresses[0].endsWith(fix)) {
                 yes = true;
@@ -73,6 +74,7 @@ async function genPerSecond() {
         var gps = temp - prev;
         prev = temp;
         postMessage(["gps", gps]);
+        postMessage(["count", finishedCount]);
         await new Promise(resolve => setTimeout(resolve, 1000));
     }
 }
