@@ -88,6 +88,8 @@
         dispath('reset');
         matches = 0;
         created = 0;
+        totalCreated = [];
+        gps = [0];
     }
 
     exampleCreation();
