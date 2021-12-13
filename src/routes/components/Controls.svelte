@@ -1,7 +1,11 @@
 
-<script>
-    import { generateAddress } from "../scripts/generateAddress";
+<script lang="ts">
+    import { createEventDispatcher } from "svelte";
+    import { ethers } from "ethers";
+
     const fixRegex = new RegExp('^([0-9a-fA-F])+$');
+
+    const dispath = createEventDispatcher();
 
     var fix = '';
     var prefix = true;
@@ -12,6 +16,13 @@
     var found = [];
 
     var startedCount = 0;
+    var finishedCount = 0;
+
+    var stats = {
+        'perSecond': 0,
+        'generated': 0,
+        'matches': 0
+    };
 
     function exampleCreation() {
         if (prefix) {
@@ -30,27 +41,19 @@
         }
     }
 
-    async function run() {
-        while (true) {
-            if (!started) {
-                break;
+    var workers = [];
+    var gps = [0];
+    var gpsCount = 0;
+    var matches = 0;
+
+    async function calcGps() {
+        while (started) {
+            var c = 0;
+            for (var i = 0; i < gps.length; i++) {
+                c += gps[i];
             }
-            generateAddress((addresses) => {
-                if (!caseSense && prefix && addresses[0].substring(2, fix.length + 2).toLowerCase() == fix.toLowerCase()) {
-                    found.push(addresses);
-                } else if (caseSense && prefix && addresses[0].substring(2, fix.length + 2) == fix) {
-                    found.push(addresses);
-                } else if (!caseSense && !prefix && addresses[0].toLowerCase().endsWith(fix.toLowerCase())) {
-                    found.push(addresses);
-                } else if (!caseSense && !prefix && addresses[0].endsWith(fix)) {
-                    found.push(addresses);
-                }
-            });
-            startedCount += 1;
-            await new Promise(resolve => setTimeout(resolve, 1));
-            if (startedCount % 1000 === 0) {
-                console.log(startedCount, found.length);
-            }
+            gpsCount = c;
+            await new Promise(resolve => setTimeout(resolve, 1000));
         }
     }
 
@@ -58,10 +61,30 @@
         started = !started;
         found = [];
         startedCount = 0;
+        for (var i = 0; i < workers.length; i++) {
+            workers[i].postMessage(["stop"]);
+            gpsCount = 0;
+        }
+        workers = [];
+        gps = [];
         if (started) {
-            for (var i = 0; i < 100; i++) {
-                run();
+            stats['matches'] = 0;
+            for (var i = 0; i < 10; i++) {
+                const worker = new Worker("/worker.js");
+                gps.push(0);
+                worker.postMessage(["start", [fix, caseSense, prefix]]);
+                worker.onmessage = function(e) {
+                    if (e.data[0] == "match") {
+                        dispath('found', e.data[1]);
+                        matches += 1;
+                    } else if (e.data[0] == "gps") {
+                        gps.shift();
+                        gps.push(e.data[1]);
+                    }
+                }
+                workers.push(worker);
             }
+            calcGps();
         }
     }
 
@@ -90,7 +113,22 @@
     </div>
 </div>
 
+<div class="stats">
+    <p>Addresses generated per second: {gpsCount}</p>
+    <p>Addresses matched: {matches}</p>
+</div>
+
 <style>
+
+    .stats {
+        margin-top: 2rem;
+    }
+
+    .stats p {
+        margin: 0;
+        margin-top: .2rem;
+    }
+
     .submit {
         padding-top: 1.4rem;
     }

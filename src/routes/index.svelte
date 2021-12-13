@@ -1,16 +1,29 @@
 <script>
+import Address from "./components/Address.svelte";
+
 import Controls from "./components/Controls.svelte";
 import Header from "./components/Header.svelte";
 import Stats from "./components/Stats.svelte";
-import { generateAddress } from "./scripts/generateAddress";
+
+var matches = [];
+
+function idk(n) {
+    matches.push(n.detail);
+    if (matches.length < 500 || matches.length % 500 === 0) {
+        matches = matches;
+    }
+}
 
 </script>
 
 <Header/>
 
 <div class="generator">
-    <div><Controls/></div>
-    <div><Stats/></div>
+    <div><Controls on:found={idk}/></div>
+    <div></div>
+    {#each matches as address, i}
+        <Address address={address[0]} k={address[1]}/>
+    {/each}
 </div>
 
 <style>
